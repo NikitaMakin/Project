@@ -1,0 +1,59 @@
+sequenceDiagram
+autonumber
+participant Client
+participant MobileApp  
+participant Catalog
+participant internalSec
+participant BackOffice
+participant Payment
+participant Notifications
+Client->> MobileApp: Оформить страховку <br/> на частный дом
+MobileApp-->>Client: форма заполнения адреса
+note over Client: заполнить адрес
+Client->>MobileApp: отправить данные
+MobileApp->>Catalog: GET api/v1/tariffs?address = "client_address"
+alt Адрес подходит для страхования
+Catalog-->>MobileApp: передать тарифы для адреса клиента
+else нет тарифов для адреса клиента
+Catalog->> MobileApp: нет подходящих тарифов
+MobileApp->>Client: по вашему адресу нет <br/> подходящих тарифов 
+note over Client: закрыть приложение
+end
+loop Документы [unlimited] 
+    Client->>MobileApp: загрузить документы <br/> для оформления полиса
+    MobileApp->>internalSec: POST api/v1/docs/verify_docs
+    note over internalSec: проверить документы (3-5 минут)
+    alt документы валидны
+        internalSec->>Catalog: запрос финальных полисов
+        Catalog->> MobileApp: передать список полисов
+        MobileApp-->> Client: список полисов
+    else Документы не валидны
+        MobileApp->>Client: исправьте [документы]
+    end
+end
+    alt Полис выбран
+        note over Client: выбрать подходящий полис
+        Client->>MobileApp: тариф выбран (кнопка "Выбрать")
+    else Полис не выбран
+        Client->>Client: тарифы не подходят
+        note over Client: закрыть приложение
+end
+MobileApp->>BackOffice: POST api/v1/tariff?<br/>sum=500&term=1 year...
+BackOffice->>BackOffice: сформировать пакет документов<br/>(полис, общие положения, пр.)
+BackOffice-->>MobileApp: отправить пакет документов
+MobileApp->> Client: документы + чек-бокс<br/> согласия на страхование
+Client->>MobileApp: подписать документы
+MobileApp->>BackOffice: документы подписаны
+note over BackOffice: принять документы
+MobileApp->>Payment: запрос формы оплаты
+Payment-->>MobileApp: передать форму оплаты
+MobileApp->> Client: показать форму оплаты
+note over Client: заполнить форму
+Client->> MobileApp: нажать кнопку "Оплатить"
+MobileApp->>Payment: передать платежные данные
+Payment-->>MobileApp: 202 "Запрос принят"
+par Асинхронно
+Payment->>Notifications: полис "321" оплачен
+BackOffice->>Notifications: пакет документов <br/> на email
+Notifications->> Client: пакет документов на email
+end
