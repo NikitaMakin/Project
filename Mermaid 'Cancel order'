@@ -1,0 +1,51 @@
+'''mermaid
+sequenceDiagram
+autonumber
+participant client
+participant frontend
+participant orders
+participant collect
+participant payment
+participant notifications
+client->> frontend: перейти в "Мои заказы"
+activate frontend
+frontend->> orders: GET api/v1/orders
+activate orders
+orders-->> frontend: передать список заказов
+frontend-->> client: список заказов
+client->> frontend: выбрать заказ со статусом "Сборка"
+frontend->> orders: GET api/v1/orders/{order_id}
+orders-->> frontend: заказ {id}
+client->> frontend: нажать "отменить заказ"
+frontend-->> client: "Отменить заказ? Да/Нет"
+client->> frontend: нажать "Да"
+frontend->> orders: POST api/v1/orders/{order_id}/cancel_order
+orders->> orders: проверить статус
+alt Статус позволяет отменить
+orders->> orders: статус "Сборка"
+else Нельзя отменить
+orders-->> frontend: статус: "Собран"
+frontend-->> client: "Отмена заказа недоступна"
+end
+par ПАРАЛЛЕЛЬНО
+orders-->>frontend: 202 ОК, {запрос принят}
+and
+orders->> payment: инициировать возврат средств клиенту
+activate payment
+end
+orders->> orders: отменить заказ
+orders->> orders: заказ отменен
+orders->> collect: отменить сборку
+activate collect
+collect-->>orders: сборка отменена
+deactivate collect
+payment-->> orders: заявка на возврат принята
+deactivate payment
+frontend-->> client: заказ отменен
+deactivate frontend
+orders-->> notifications: заказ отменен
+activate notifications
+notifications-->> orders: уведомление отправлено
+deactivate orders
+notifications->> client: уведомление об успешном возврате
+deactivate notifications
