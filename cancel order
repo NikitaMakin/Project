@@ -1,0 +1,47 @@
+sequenceDiagram
+autonumber
+participant client
+participant frontend
+participant orders
+participant collect
+participant payment
+participant notifications
+   activate frontend
+client->> frontend: перейти в "Мои заказы"
+   activate orders
+frontend->> orders: GET api/v1/orders
+orders-->> frontend: передать список заказов
+deactivate orders
+client->> frontend: выбрать заказ со статусом "Сборка"
+frontend->> orders: GET api/v1/orders/{order_id}
+activate orders
+orders-->> frontend: заказ {id}
+deactivate orders
+client->> frontend: нажать "отменить заказ"
+frontend-->> client: "Отменить заказ? Да/Нет"
+client->> frontend: нажать "Да"
+frontend->> orders: POST api/v1/orders/{order_id}/cancel_order
+activate orders
+orders->> orders: проверить статус
+alt Статус: Сборка
+    note over orders: Сборка
+orders->> orders: отменить заказ
+orders->> collect: отменить сборку
+activate collect
+collect-->>orders: сборка отменена
+deactivate collect
+orders-->>frontend: 200 ОК, {canceled}
+else Заказ уже собран
+orders-->> frontend: 403 Forbidden
+end
+orders->> notifications: отправить уведомление клиенту
+activate notifications
+notifications-->>orders: уведомление отправлено
+deactivate notifications
+orders->> payment: инициировать возврат средств клиенту
+activate payment
+payment-->> orders: заявка на возврат оформлена
+deactivate orders
+deactivate payment
+frontend-->>client: заказ 1224 отменён!
+deactivate frontend
