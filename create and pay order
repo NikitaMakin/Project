@@ -1,0 +1,83 @@
+sequenceDiagram
+autonumber
+participant Client
+participant Frontend
+participant Auth
+participant Products
+participant Order
+participant Payment
+participant Notification
+Client ->> Frontend: Войти в приложение
+Frontend->> Auth: GET api/v1/auth_data
+Auth-->> Frontend: auth_data
+Frontend -->> Client: показать окно ввода логина и пароля
+note over Client: Ввести данные
+Client ->> Frontend: отправить данные
+Frontend ->> Auth: передать авторизационные данные клиента POST www.vprok/api/v1/auth
+note over Auth: валидация пользователя
+alt Авторизован успешно
+    Auth -->> Frontend: 200 OK
+    Frontend -->> Client: успешный вход
+else Не авторизован
+    Auth -->> Frontend: 401 Клиент не авторизован
+    Frontend ->> Client: "Восстановить пароль?"
+    opt Восстановить пароль
+    Client->> Frontend: Восстановить пароль/отправить код в пуш/смс
+    Frontend->> Auth: GET api/v1/new_auth_data
+    note over Auth: сформировать new_auth_data
+    Auth->> Notification: отправить пуш/смс
+    Notification-->>Auth: отправлено
+    Notification->>Client: new_auth_data
+    Auth-->> Frontend: new_auth_data
+    Frontend-->>Client: введите данные для сброса пароля
+    Client->> Frontend: ввод новых данных
+    Frontend->>Auth: POST /api/v1/auth/reset-confirm
+    Auth-->>Frontend: 200 OK
+    end
+end
+Frontend->> Products: GET /api/v1/products
+Products-->> Frontend: каталог товаров
+Frontend-->> Client: показать каталог
+Client->>Frontend: Ввести в строку поиска "Товар 1"
+Frontend->>Products: GET /api/v1/products/search
+Products-->> Frontend: передать список товаров
+Frontend-->> Client: отобразить список товаров
+Client->> Frontend: добавить товар 1
+Frontend->> Order: POST /api/v1/product/{product_id}
+Order-->> Frontend: 200 OK
+note over Frontend: добавлен товар 1
+Client->>Frontend: Ввести в строку поиска "Товар 2"
+Frontend->>Products: GET /api/v1/products/{product_id}
+Products-->> Frontend: передать список товаров
+Frontend-->> Client: отобразить список товаров
+Client->> Frontend: добавить товар 2
+note over Frontend: 
+Client->>Frontend: оформить заказ
+Frontend->> Payment: GET api/v1/payment_form
+Payment-->> Frontend: payment_form
+Frontend-->>Client: показать форму оплаты
+note over Client: заполнить данные платежа
+Client->>Frontend: нажать кнопку "Оплатить"
+Frontend->> Payment: отправить данные платежа
+loop Максимум 2 попытки
+  note over Payment: провести платеж
+   alt Платеж прошел
+       Payment-->>Frontend: 200 OK
+       Frontend->>Order: POST /api/v1/orders
+       Order-->>Frontend: заказ 241523 создан
+       Order->>Order: оплачено
+       Order->> Frontend: "Заказ 241523 оплачен!"
+       Frontend-->>Client: "Ваш Заказ оплачен!"
+       Order->>Notification: оплата заказа подтверждена
+       Notification-->>Order: отправлено уведомление об успешной оплате
+   else Платеж отклонен
+       Payment-->>Frontend: 400 Bad Request
+       Frontend->>Client: "Платеж провести не удалось. Повторить платеж?Да/Нет"
+       Client->> Frontend: Нет
+       Frontend->> Payment: оплата отменена
+       Payment->> Notification: отправить уведомление о неуспешной оплате
+       Notification->> Client: Заказ 23423 оплатить не удалось
+       Notification-->> Payment: отправлено
+   end
+end
+note over Client: После 2 неудачных попыток оплаты процесс завершается
