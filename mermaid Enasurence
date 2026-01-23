@@ -2,59 +2,89 @@
 sequenceDiagram
 autonumber
 participant Client
-participant MobileApp  
+participant MobileApp
+participant Auth
 participant Catalog
 participant internalSec
 participant BackOffice
 participant Payment
 participant Notifications
+Client ->> MobileApp: Войти в приложение
+activate MobileApp
+MobileApp->> Auth: GET api/v1/auth_data
+activate Auth
+Auth-->> MobileApp: auth_data
+deactivate Auth
+MobileApp -->> Client: показать окно ввода логина и пароля
+note over Client: Ввести данные
+Client ->> MobileApp: отправить данные
+MobileApp ->> Auth: передать авторизационные данные <br/> клиента POST www./api/v1/auth_data
+activate Auth
+note right of Auth: валидация пользователя
+Auth -->> MobileApp: 200 OK
+deactivate Auth
+MobileApp -->> Client: личный кабинет
 Client->> MobileApp: Оформить страховку <br/> на частный дом
-MobileApp-->>Client: форма заполнения адреса
+MobileApp->> Catalog: GET: api/v1/fill_adress
+activate Catalog
+Catalog-->>MobileApp: форма заполнения адреса
+deactivate Catalog
+MobileApp-->>Client: показать форму <br/> заполнения адреса
 note over Client: заполнить адрес
 Client->>MobileApp: отправить данные
-MobileApp->>Catalog: GET api/v1/tariffs?address = "client_address"
+MobileApp->>Catalog: GET api/v1/tariffs? <br/> address = "client_address"
+activate Catalog
 alt Адрес подходит для страхования
 Catalog-->>MobileApp: передать тарифы для адреса клиента
 else нет тарифов для адреса клиента
 Catalog->> MobileApp: нет подходящих тарифов
-MobileApp->>Client: по вашему адресу нет <br/> подходящих тарифов 
+deactivate Catalog
+MobileApp->>Client: по вашему адресу нет <br/> подходящих тарифов
 note over Client: закрыть приложение
 end
-loop Документы [unlimited] 
-    Client->>MobileApp: загрузить документы <br/> для оформления полиса
-    MobileApp->>internalSec: POST api/v1/docs/verify_docs
-    note over internalSec: проверить документы (3-5 минут)
-    alt документы валидны
-        internalSec->>Catalog: запрос финальных полисов
-        Catalog->> MobileApp: передать список полисов
-        MobileApp-->> Client: список полисов
-    else Документы не валидны
-        MobileApp->>Client: исправьте [документы]
-    end
-end
-    alt Полис выбран
-        note over Client: выбрать подходящий полис
-        Client->>MobileApp: тариф выбран (кнопка "Выбрать")
-    else Полис не выбран
-        Client->>Client: тарифы не подходят
-        note over Client: закрыть приложение
+loop Документы [unlimited]
+   Client->>MobileApp: загрузить документы <br/> для оформления полиса
+   MobileApp->>internalSec: POST api/v1/docs/verify_docs
+activate internalSec
+   note over internalSec: проверить документы(3-5 минут)
+alt документы валидны
+       internalSec->>BackOffice: GET api/v1/tariffs/{client_id}
+       BackOffice->> internalSec: tariffs{client_id}
+       internalSec->> MobileApp: [тарифы для клиента]
+       deactivate internalSec
+       MobileApp-->> Client: список полисов
+   else Документы не валидны
+       MobileApp->>Client: исправьте [документы]
+   end
+       note over Client: выбрать подходящий полис
+       Client->>MobileApp: тариф выбран (кнопка "Выбрать")
 end
 MobileApp->>BackOffice: POST api/v1/tariff?<br/>sum=500&term=1 year...
+activate BackOffice
 BackOffice->>BackOffice: сформировать пакет документов<br/>(полис, общие положения, пр.)
 BackOffice-->>MobileApp: отправить пакет документов
 MobileApp->> Client: документы + чек-бокс<br/> согласия на страхование
-Client->>MobileApp: подписать документы
+Client->>MobileApp: подписать документы <br/> (нажать чек-бокс согласия на страхование)
 MobileApp->>BackOffice: документы подписаны
 note over BackOffice: принять документы
+BackOffice-->> MobileApp: документы приняты
 MobileApp->>Payment: запрос формы оплаты
+activate Payment
 Payment-->>MobileApp: передать форму оплаты
 MobileApp->> Client: показать форму оплаты
 note over Client: заполнить форму
 Client->> MobileApp: нажать кнопку "Оплатить"
 MobileApp->>Payment: передать платежные данные
-Payment-->>MobileApp: 202 "Запрос принят"
-par Асинхронно
-Payment->>Notifications: полис "321" оплачен
-BackOffice->>Notifications: пакет документов <br/> на email
+Payment-->>MobileApp: 200 OK
+deactivate MobileApp
+par
+Payment->>BackOffice: полис "321" оплачен
+deactivate Payment
+and
+BackOffice->> Notifications: отправить пакет документов <br/> на email
+activate Notifications
+Notifications-->> BackOffice: запрос принят
+deactivate BackOffice
 Notifications->> Client: пакет документов на email
+deactivate Notifications
 end
