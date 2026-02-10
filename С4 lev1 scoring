@@ -1,0 +1,26 @@
+flowchart TD
+    A[Клиент<br/>Web/Mobile] --> B[Банк: Система<br/>выпуска кредитных карт]
+    
+    B --> C[Внешние сервисы<br/>KYC/AML провайдеры<br/>Госреестры]
+    
+    B --> D[Партнеры<br/>Эмитент карт<br/>Курьерская доставка]
+    
+    %% Основной поток
+    A -.->|Заявка на карту| B
+    B -.->|Проверки + выпуск| C
+    B -.->|Выпуск + доставка| D
+    
+    %% Результаты
+    D --> E[Клиент<br/>Карта получена<br/>⏱️ 3 мин<br/>99.9% успех]
+    
+    %% Метрики на схеме
+    classDef system fill:#e3f2fd,stroke:#2196f3,stroke-width:3px
+    classDef external fill:#f3e5f5,stroke:#9c27b0
+    classDef success fill:#e8f5e8,stroke:#4caf50
+    
+    class B system
+    class C,D external
+    class E success
+    
+    style B fill:#bbdefb
+    style E fill:#c8e6c9
