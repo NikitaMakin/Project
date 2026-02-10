@@ -1,0 +1,39 @@
+flowchart TD
+    A[Клиент подает заявку<br/>POST /apply<br/>SLA 200ms] --> B[Оркестратор<br/>Saga координатор]
+    
+    B --> C[Kafka события<br/>Параллельный запуск<br/>-40% времени]
+    C --> D[Сервис KYC<br/>Проверка документов]
+    C --> E[Сервис скоринга<br/>Оценка рисков ML]
+    
+    D --> F[Внешний KYC API<br/>Госреестры<br/>sync 2s]
+    F --> D
+    D --> G[Kafka: kyc.passed]
+    
+    E --> H[Kafka: score.approved<br/>60% auto-approve]
+    
+    G --> I[Оркестратор<br/>Все события готовы?]
+    H --> I
+    
+    I -->|Да| J[Сервис выпуска карт<br/>Эмитент]
+    J --> K[Kafka: card.issued]
+    K --> L[Сервис доставки<br/>Курьер]
+    L --> M[Клиент: Карта доставлена<br/>⏱️ 3 мин всего]
+    
+    %% Компенсации (откаты)
+    I -->|Ошибка KYC| N[Компенсация:<br/>Revoke KYC<br/>красная линия]
+    J -->|Ошибка карт| O[Компенсация:<br/>Revoke card<br/>Idempotency UUID]
+    
+    N -.->|DLQ + retry| B
+    O -.->|DLQ + retry| B
+    
+    %% Метрики
+    classDef success fill:#d4edda,stroke:#28a745
+    classDef error fill:#f8d7da,stroke:#dc3545
+    classDef key fill:#fff3cd,stroke:#ffc107
+    
+    class A,B,C,I,M key
+    class D,E,J,L success
+    class N,O error
+    
+    style C fill:#cce5ff
+    style N stroke:#ff4444,stroke-width:3px
